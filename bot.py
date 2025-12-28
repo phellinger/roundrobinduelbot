@@ -6,7 +6,7 @@ import os
 import logging
 from typing import List, Tuple
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Load environment variables
@@ -24,6 +24,13 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables")
+
+# Persistent keyboard with Start button
+START_KEYBOARD = ReplyKeyboardMarkup(
+    [[KeyboardButton("🔄 Start New Tournament")]],
+    resize_keyboard=True,
+    one_time_keyboard=False
+)
 
 
 def generate_round_robin(players: List[str]) -> Tuple[List[List[Tuple[str, str]]], List[str]]:
@@ -144,12 +151,21 @@ Alice, Bob, Charlie, David
 
 Send me your player list to get started! 🎯
 """
-    await update.message.reply_text(usage_text, parse_mode='Markdown')
+    await update.message.reply_text(
+        usage_text,
+        parse_mode='Markdown',
+        reply_markup=START_KEYBOARD
+    )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming messages with player lists."""
     message_text = update.message.text.strip()
+
+    # Handle "Start New Tournament" button press
+    if message_text == "🔄 Start New Tournament" or message_text == "/start":
+        await start(update, context)
+        return
 
     # Parse comma-separated players
     players = [p.strip() for p in message_text.split(',') if p.strip()]
@@ -157,7 +173,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(players) < 2:
         await update.message.reply_text(
             "❌ Please provide at least 2 players separated by commas.\n\n"
-            "Example: Alice, Bob, Charlie"
+            "Example: Alice, Bob, Charlie",
+            reply_markup=START_KEYBOARD
         )
         return
 
@@ -171,7 +188,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if len(unique_players) < 2:
         await update.message.reply_text(
-            "❌ Please provide at least 2 unique players."
+            "❌ Please provide at least 2 unique players.",
+            reply_markup=START_KEYBOARD
         )
         return
 
@@ -179,11 +197,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         rounds, byes_per_round = generate_round_robin(unique_players)
         output = format_round_robin_output(unique_players, rounds, byes_per_round)
-        await update.message.reply_text(output, parse_mode='Markdown')
+        await update.message.reply_text(
+            output,
+            parse_mode='Markdown',
+            reply_markup=START_KEYBOARD
+        )
     except Exception as e:
         logger.error(f"Error generating round robin: {e}")
         await update.message.reply_text(
-            "❌ An error occurred while generating the tournament schedule. Please try again."
+            "❌ An error occurred while generating the tournament schedule. Please try again.",
+            reply_markup=START_KEYBOARD
         )
 
 
